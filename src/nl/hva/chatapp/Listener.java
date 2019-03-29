@@ -3,22 +3,25 @@ package nl.hva.chatapp;
 
 import nl.hva.chatapp.exceptions.ServerPortException;
 
-import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.List;
 import java.util.Vector;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class Listener {
-    private  Logger LOGGER = Logger.getLogger(ConnectionHandler.class.getName());
+    private final Logger LOGGER = Logger.getLogger(ConnectionHandler.class.getName());
     private Config config = new Config();
     private int connectionID = 0;
+    private Lock mutex = new ReentrantLock();
 
     static List<ConnectionHandler> connections = new Vector<>();
+    static List<Thread> threads = new Vector<>();
 
-    public void runServer() throws IOException, ServerPortException {
+    public void runServer() throws ServerPortException {
         try (ServerSocket serverSocket = new ServerSocket(config.PORT)) {
             LOGGER.log(Level.INFO, String.format("Started on PORT: %s", config.PORT));
 
@@ -32,7 +35,12 @@ public class Listener {
 
                 Thread newConnectionThread = new Thread(newConnectionHandler);
 
+                mutex.lock();
+                threads.add(newConnectionThread);
+
                 connections.add(newConnectionHandler);
+
+                mutex.unlock();
 
                 newConnectionThread.start();
 
