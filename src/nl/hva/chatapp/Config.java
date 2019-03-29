@@ -6,29 +6,29 @@ import org.json.simple.parser.ParseException;
 
 import java.io.FileReader;
 import java.io.IOException;
+import java.net.URL;
 
-public class Config extends Main {
+public class Config {
     public int PORT;
 
     public Config() {
         JSONParser parser = new JSONParser();
 
         try {
+
             int JSONPort;
-            Object obj = parser.parse(new FileReader("/Users/luc_d/IdeaProjects/chatapp/src/nl/hva/chatapp/settings.json"));
+            URL url = getClass().getResource("settings.json");
+            Object obj = parser.parse(new FileReader(url.getPath()));
 
             JSONObject jsonObject = (JSONObject) obj;
 
             JSONPort = Math.toIntExact((long) jsonObject.get("port"));
             this.PORT = JSONPort;
 
-        } catch (ParseException e) {
+
+        } catch (ParseException | IOException e) {
             e.printStackTrace();
             this.PORT = Main.PORT;
-        } catch (IOException e) {
-            e.printStackTrace();
         }
-
-
     }
 }
