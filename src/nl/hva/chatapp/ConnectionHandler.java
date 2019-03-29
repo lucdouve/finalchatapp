@@ -5,43 +5,57 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStreamWriter;
 import java.net.Socket;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class ConnectionHandler extends User implements Runnable {
-    private Logger LOGGER = Logger.getLogger(ConnectionHandler.class.getName());
-    private Socket sockete;
+    private final Logger LOGGER = Logger.getLogger(ConnectionHandler.class.getName());
     private int connectionID;
     private final InputStream input;
     private final BufferedWriter output;
-    private boolean isLoggedin;
+    private Lock mutex = new ReentrantLock();
+    public boolean isLoggedin;
+
 
     public ConnectionHandler(Socket socket, int connectionID) throws IOException {
 
         LOGGER.log(Level.INFO, "Created new connectionHandler for connection" + connectionID);
-        this.sockete = socket;
         this.connectionID = connectionID;
 
-        this.output = new BufferedWriter(new OutputStreamWriter(sockete.getOutputStream()));
-        this.input = this.sockete.getInputStream();
+        this.output = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+        this.input = socket.getInputStream();
     }
 
     @Override
     public void run() {
-        setUsername();
+        setUsername(this);
 
         String msg;
 
-        while (true) {
+        while (isLoggedin) {
             msg = readInput();
 
             if (msg != null) {
                 if (msg.contains("SERVEROK#QUIT")) {
                     this.isLoggedin= false;
                     LOGGER.log(Level.INFO, "Client disconnected, connetion ID: " + this.connectionID);
+                    this.isLoggedin = false;
+                    Listener.connections.remove(this);
+                    mutex.lock();
+                    Thread thread = Listener.threads.get(connectionID);
+                    mutex.unlock();
+                    try {
+                        thread.join();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+
                     for (ConnectionHandler connectionHandler: Listener.connections) {
                         if (connectionHandler.isLoggedin) {
                             connectionHandler.sendMessage("[" + name + "] Left the room");
+
                         }
                     }
                 } else {
@@ -60,7 +74,7 @@ public class ConnectionHandler extends User implements Runnable {
     }
 
 
-    private String readInput() {
+    public String readInput() {
         int read;
 
         byte[] buffer = new byte[Main.BUFFER];
@@ -78,46 +92,11 @@ public class ConnectionHandler extends User implements Runnable {
         return null;
     }
 
-    private void setUsername() {
-        boolean set = false;
-        String newUsername;
-        String agree;
-        do {
-            sendMessage("SERVERINPUT#Please provide a username; ");
-
-            newUsername = readInput();
-
-            sendMessage("SERVERINPUT#Do you want to use this username?: " + newUsername + " [Y/N]");
-
-            agree = readInput();
-
-            if (agree != null) {
-                if (agree.equals("Y") || agree.equals("y")) {
-                    set = true;
-                }
-
-                if (agree.equals("N") || agree.equals("n")) {
-                    set = false;
-                }
-            }
-
-        } while (!set);
-
-        sendMessage("SERVEROK#Username set!!");
-        name = newUsername;
-        this.isLoggedin = true;
-
-        for (ConnectionHandler connectionHandler: Listener.connections) {
-            if (connectionHandler.isLoggedin) {
-                connectionHandler.sendMessage("[" + name + "] Joined the room!");
-            }
-        }
-    }
-
     public void sendMessage(String msg) {
         try {
             output.write(msg);
             output.flush();
+            LOGGER.log(Level.INFO, "Sent message");
         } catch (IOException e) {
             e.printStackTrace();
         }
