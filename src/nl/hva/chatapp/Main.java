@@ -2,7 +2,6 @@ package nl.hva.chatapp;
 
 import nl.hva.chatapp.exceptions.ServerPortException;
 
-import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -18,7 +17,7 @@ public class Main {
 
         try {
             listener.runServer();
-        } catch (IOException | ServerPortException e) {
+        } catch (ServerPortException e) {
             e.printStackTrace();
         }
     }
